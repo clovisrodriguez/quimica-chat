@@ -1,14 +1,11 @@
-# Quimica Chat — Project Context for Claude
-
-## What is this?
-Interactive organic chemistry tutor (Spanish) with AI + visual molecule builder. Targets students who struggle with the repetitive practice side of chemistry (nomenclature, formulas, exercises) — replacing the feedback loop that normally requires a tutor or waiting for office hours.
+# Quimica Chat — Project Context
 
 ## Architecture
 - **Frontend:** React 18 + Vite + Tailwind CSS (`client/`)
 - **Backend:** Express + OpenAI GPT streaming via SSE (`server/`)
 - **AI tools:** `draw_molecule` (builds molecules in constructor), `show_bohr_model` (shows atomic structure)
 - **Class mode:** 10-lesson curriculum with localStorage progress tracking
-- **Tests:** Vitest + React Testing Library (162 tests)
+- **Tests:** Vitest + React Testing Library
 
 ## Key files
 - `server/index.js` — API endpoint, system prompts, tool definitions
@@ -21,10 +18,8 @@ Interactive organic chemistry tutor (Spanish) with AI + visual molecule builder.
 
 ## Conventions
 - All UI text in Spanish
-- No emojis in code unless user requests
-- Keep changes minimal — don't over-engineer
 - Run `npx vite build` and `npx vitest run` from `client/` to verify changes
+- Keep changes minimal — don't over-engineer
 
-## Session tracking
-- See [JOURNAL.md](./JOURNAL.md) for session-by-session log
-- See [TODO.md](./TODO.md) for upcoming work
+## Contributing
+Self-host with your own OpenAI API key. See README.md for setup.
