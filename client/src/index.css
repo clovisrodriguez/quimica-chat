@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #4b5563 transparent;
+  }
+}
+
+.atom-palette-btn {
+  @apply cursor-pointer transition-all duration-150 hover:scale-110 hover:brightness-110 active:scale-95;
+}
+
+.chat-bubble-user {
+  @apply bg-blue-600 text-white rounded-2xl rounded-br-md px-4 py-2 max-w-[80%] ml-auto;
+}
+
+.chat-bubble-assistant {
+  @apply bg-gray-800 text-gray-100 rounded-2xl rounded-bl-md px-4 py-2 max-w-[80%];
+}
+
+.chat-bubble-assistant p {
+  @apply mb-2 last:mb-0;
+}
+
+.chat-bubble-assistant ul,
+.chat-bubble-assistant ol {
+  @apply ml-4 mb-2;
+}
+
+.chat-bubble-assistant li {
+  @apply mb-1;
+}
+
+.chat-bubble-assistant code {
+  @apply bg-gray-700 px-1.5 py-0.5 rounded text-sm font-mono;
+}
+
+.chat-bubble-assistant pre {
+  @apply bg-gray-900 rounded-lg p-3 overflow-x-auto my-2;
+}
+
+.chat-bubble-assistant strong {
+  @apply text-emerald-300;
+}
+
+@keyframes pulse-dot {
+  0%, 80%, 100% { opacity: 0.3; }
+  40% { opacity: 1; }
+}
+
+.typing-dot {
+  animation: pulse-dot 1.4s infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
