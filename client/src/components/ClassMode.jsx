@@ -4,7 +4,7 @@ import { loadProgress, saveProgress, markLessonComplete } from '../data/progress
 import LessonList from './LessonList';
 import LessonChat from './LessonChat';
 
-export default function ClassMode({ onDrawMolecule, onShowBohrModel }) {
+export default function ClassMode({ onDrawMolecule, onShowBohrModel, onShowPeriodicTable, onClearConstructor }) {
   const [progress, setProgress] = useState(() => loadProgress());
   const [activeLessonId, setActiveLessonId] = useState(null);
 
@@ -13,12 +13,14 @@ export default function ClassMode({ onDrawMolecule, onShowBohrModel }) {
     : null;
 
   const handleSelectLesson = useCallback((lessonId) => {
+    onClearConstructor?.();
     setActiveLessonId(lessonId);
-  }, []);
+  }, [onClearConstructor]);
 
   const handleBack = useCallback(() => {
+    onClearConstructor?.();
     setActiveLessonId(null);
-  }, []);
+  }, [onClearConstructor]);
 
   const handleMarkComplete = useCallback(() => {
     if (!activeLessonId) return;
@@ -36,6 +38,7 @@ export default function ClassMode({ onDrawMolecule, onShowBohrModel }) {
         lesson={activeLesson}
         onDrawMolecule={onDrawMolecule}
         onShowBohrModel={onShowBohrModel}
+        onShowPeriodicTable={onShowPeriodicTable}
         onMarkComplete={handleMarkComplete}
         onBack={handleBack}
       />

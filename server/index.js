@@ -25,6 +25,10 @@ Reglas:
 Tienes una herramienta "show_bohr_model" que muestra el modelo atómico de Bohr de un elemento.
 Cuando el usuario pida ver la estructura atómica de un elemento, usa show_bohr_model con el símbolo (H, C, O, N, S, P, F, Cl, Br, I).
 
+También tienes una herramienta "show_periodic_table" que muestra la tabla periódica interactiva.
+Usa show_periodic_table cuando el usuario pregunte sobre la tabla periódica, tendencias periódicas o electronegatividad.
+Puedes resaltar elementos específicos con el parámetro highlight (ej: highlight=['C','N','O']).
+
 También tienes una herramienta "draw_molecule" que dibuja moléculas en un constructor visual.
 Cuando el usuario pida dibujar, armar o mostrar una molécula, usa la herramienta.
 El canvas es de aproximadamente 600x400 píxeles. Centra la molécula y espacia los átomos ~60px entre sí.
@@ -69,7 +73,7 @@ const SHOW_BOHR_MODEL_TOOL = {
   type: "function",
   function: {
     name: "show_bohr_model",
-    description: "Muestra el modelo atómico de Bohr de un elemento en el constructor visual. Muestra el núcleo (protones y neutrones) y las capas electrónicas con sus electrones. Elementos disponibles: H, C, O, N, S, P, F, Cl, Br, I.",
+    description: "DEBES usar esta herramienta siempre que enseñes sobre estructura atómica. Muestra el modelo atómico de Bohr de un elemento en el constructor visual. NUNCA describas un modelo de Bohr en texto — siempre usa esta herramienta para mostrarlo visualmente. Elementos disponibles: H, C, O, N, S, P, F, Cl, Br, I.",
     parameters: {
       type: "object",
       properties: {
@@ -87,7 +91,7 @@ const DRAW_MOLECULE_TOOL = {
   type: "function",
   function: {
     name: "draw_molecule",
-    description: "Dibuja una molécula en el constructor visual. Canvas ~600x400px, espacia átomos ~60px. Incluye todos los hidrógenos explícitamente.",
+    description: "DEBES usar esta herramienta siempre que enseñes sobre moléculas o enlaces. Dibuja una molécula en el constructor visual. NUNCA describas una molécula sin dibujarla — siempre usa esta herramienta. Canvas ~600x400px, espacia átomos ~60px. Incluye todos los hidrógenos explícitamente.",
     parameters: {
       type: "object",
       properties: {
@@ -121,6 +125,42 @@ const DRAW_MOLECULE_TOOL = {
   },
 };
 
+const SHOW_PERIODIC_TABLE_TOOL = {
+  type: "function",
+  function: {
+    name: "show_periodic_table",
+    description: "Muestra la tabla periódica interactiva en el constructor visual. Opcionalmente resalta elementos específicos para comparar tendencias (ej: electronegatividad). El estudiante puede hacer clic en elementos soportados (H, C, N, O, S, P, F, Cl, Br, I) para ver su modelo de Bohr.",
+    parameters: {
+      type: "object",
+      properties: {
+        highlight: {
+          type: "array",
+          items: { type: "string" },
+          description: "Lista opcional de símbolos de elementos a resaltar (ej: ['C', 'N', 'O'] para comparar electronegatividad)",
+        },
+      },
+    },
+  },
+};
+
+const COMPLETE_LESSON_TOOL = {
+  type: "function",
+  function: {
+    name: "complete_lesson",
+    description: "Marca la lección como completada. SOLO usa esta herramienta cuando el estudiante haya demostrado comprensión del tema a través de respuestas correctas a tus preguntas y quizzes. Nunca la uses al inicio de la lección ni antes de evaluar al estudiante.",
+    parameters: {
+      type: "object",
+      properties: {
+        reason: {
+          type: "string",
+          description: "Breve justificación de por qué el estudiante aprobó la lección",
+        },
+      },
+      required: ["reason"],
+    },
+  },
+};
+
 app.post('/api/chat', async (req, res) => {
   const { messages, systemPrompt } = req.body;
 
@@ -142,10 +182,10 @@ app.post('/api/chat', async (req, res) => {
     const stream = await openai.chat.completions.create({
       model: 'gpt-5.2-chat-latest',
       messages: allMessages,
-      tools: [DRAW_MOLECULE_TOOL, SHOW_BOHR_MODEL_TOOL],
+      tools: [DRAW_MOLECULE_TOOL, SHOW_BOHR_MODEL_TOOL, SHOW_PERIODIC_TABLE_TOOL, COMPLETE_LESSON_TOOL],
       stream: true,
 
-      max_completion_tokens: 2048,
+      max_completion_tokens: messages.length <= 2 ? 800 : 2048,
     });
 
     // Accumulate tool call deltas and text content
@@ -198,6 +238,23 @@ app.post('/api/chat', async (req, res) => {
             content: JSON.stringify({ success: false, message: 'Error al parsear la molécula.' }),
           });
         }
+      } else if (tc.name === 'complete_lesson') {
+        try {
+          const { reason } = JSON.parse(tc.arguments);
+          res.write(`data: ${JSON.stringify({ lessonComplete: true, reason })}\n\n`);
+          toolResults.push({
+            tool_call_id: tc.id,
+            role: 'tool',
+            content: JSON.stringify({ success: true, message: 'Lección marcada como completada. Felicita al estudiante.' }),
+          });
+        } catch (parseErr) {
+          console.error('Error parsing complete_lesson arguments:', parseErr.message);
+          toolResults.push({
+            tool_call_id: tc.id,
+            role: 'tool',
+            content: JSON.stringify({ success: false, message: 'Error al procesar la finalización.' }),
+          });
+        }
       } else if (tc.name === 'show_bohr_model') {
         try {
           const { element } = JSON.parse(tc.arguments);
@@ -213,6 +270,23 @@ app.post('/api/chat', async (req, res) => {
             tool_call_id: tc.id,
             role: 'tool',
             content: JSON.stringify({ success: false, message: 'Error al parsear el modelo de Bohr.' }),
+          });
+        }
+      } else if (tc.name === 'show_periodic_table') {
+        try {
+          const { highlight } = JSON.parse(tc.arguments || '{}');
+          res.write(`data: ${JSON.stringify({ periodicTable: { highlight: highlight || [] } })}\n\n`);
+          toolResults.push({
+            tool_call_id: tc.id,
+            role: 'tool',
+            content: JSON.stringify({ success: true, message: 'Tabla periódica mostrada en el constructor. El estudiante puede hacer clic en los elementos soportados (H, C, N, O, S, P, F, Cl, Br, I) para ver su modelo de Bohr.' }),
+          });
+        } catch (parseErr) {
+          console.error('Error parsing show_periodic_table arguments:', parseErr.message);
+          toolResults.push({
+            tool_call_id: tc.id,
+            role: 'tool',
+            content: JSON.stringify({ success: false, message: 'Error al mostrar la tabla periódica.' }),
           });
         }
       }

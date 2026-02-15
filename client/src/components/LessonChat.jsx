@@ -1,25 +1,43 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import ChatMessage from './ChatMessage';
 
-export default function LessonChat({ lesson, onDrawMolecule, onShowBohrModel, onMarkComplete, onBack }) {
+export default function LessonChat({ lesson, onDrawMolecule, onShowBohrModel, onShowPeriodicTable, onMarkComplete, onBack }) {
   const [messages, setMessages] = useState([]);       // visible messages
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
-  const [userMessageCount, setUserMessageCount] = useState(0);
+  const [lessonCompleted, setLessonCompleted] = useState(false);
   const messagesEndRef = useRef(null);
+  const scrollContainerRef = useRef(null);
   const inputRef = useRef(null);
   const initRef = useRef(false);
   const apiMessagesRef = useRef([]);                   // full history for API
+  const userScrolledUpRef = useRef(false);
+  const isAutoScrollingRef = useRef(false);
 
+  // Track if user scrolled up (ignore programmatic scrolls)
+  const handleScroll = useCallback(() => {
+    if (isAutoScrollingRef.current) return;
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    userScrolledUpRef.current = distanceFromBottom > 80;
+  }, []);
+
+  // Smart auto-scroll: only if user hasn't scrolled up
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (userScrolledUpRef.current) return;
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    isAutoScrollingRef.current = true;
+    el.scrollTop = el.scrollHeight;
+    requestAnimationFrame(() => { isAutoScrollingRef.current = false; });
   }, [messages]);
 
   // Auto-trigger AI greeting on mount (hidden user message)
   useEffect(() => {
     if (initRef.current) return;
     initRef.current = true;
-    const initMsg = { role: 'user', content: `Comencemos la lección sobre: ${lesson.title}` };
+    const initMsg = { role: 'user', content: 'Hola, estoy listo para aprender.' };
     apiMessagesRef.current = [initMsg];
     streamResponse([initMsg]);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -30,8 +48,9 @@ export default function LessonChat({ lesson, onDrawMolecule, onShowBohrModel, on
     const userMessage = { role: 'user', content: text.trim() };
     apiMessagesRef.current = [...apiMessagesRef.current, userMessage];
     setMessages((prev) => [...prev, userMessage]);
-    setUserMessageCount((c) => c + 1);
     setInput('');
+    // Reset scroll tracking when user sends a message
+    userScrolledUpRef.current = false;
 
     streamResponse(apiMessagesRef.current);
   }
@@ -99,6 +118,21 @@ export default function LessonChat({ lesson, onDrawMolecule, onShowBohrModel, on
                 return updated;
               });
             }
+            if (parsed.periodicTable) {
+              onShowPeriodicTable?.(parsed.periodicTable);
+              setMessages((prev) => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1];
+                updated[updated.length - 1] = {
+                  ...last,
+                  content: last.content + '\n\n📋 *Tabla periódica mostrada en el constructor*',
+                };
+                return updated;
+              });
+            }
+            if (parsed.lessonComplete) {
+              setLessonCompleted(true);
+            }
             if (parsed.content) {
               accumulated += parsed.content;
               setMessages((prev) => {
@@ -114,6 +148,15 @@ export default function LessonChat({ lesson, onDrawMolecule, onShowBohrModel, on
         }
       }
 
+      // If no text was accumulated, show a fallback
+      if (!accumulated) {
+        accumulated = 'No recibí respuesta del servidor. Intenta de nuevo.';
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = { role: 'assistant', content: accumulated };
+          return updated;
+        });
+      }
       // Add assistant response to API history
       apiMessagesRef.current = [...apiMessagesRef.current, { role: 'assistant', content: accumulated }];
     } catch (error) {
@@ -135,8 +178,6 @@ export default function LessonChat({ lesson, onDrawMolecule, onShowBohrModel, on
     sendMessage(input);
   }
 
-  const canComplete = userMessageCount >= 2 && !isStreaming;
-
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -157,16 +198,20 @@ export default function LessonChat({ lesson, onDrawMolecule, onShowBohrModel, on
       {/* Exercise banner */}
       {lesson.exercise && (
         <div className="px-4 py-2 border-b border-amber-900/50 bg-amber-900/20 shrink-0">
-          <p className="text-xs font-medium text-amber-400">📝 Ejercicio</p>
+          <p className="text-xs font-medium text-amber-400">Ejercicio</p>
           <p className="text-xs text-amber-200/80 mt-0.5">{lesson.exercise.instruction}</p>
           {lesson.exercise.hint && (
-            <p className="text-xs text-gray-500 mt-0.5 italic">💡 {lesson.exercise.hint}</p>
+            <p className="text-xs text-gray-500 mt-0.5 italic">{lesson.exercise.hint}</p>
           )}
         </div>
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-4 space-y-3"
+      >
         {messages.map((msg, i) => (
           <ChatMessage
             key={i}
@@ -177,8 +222,21 @@ export default function LessonChat({ lesson, onDrawMolecule, onShowBohrModel, on
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input + complete */}
-      <div className="p-3 border-t border-gray-800 bg-gray-900/50 shrink-0 space-y-2">
+      {/* Completion banner */}
+      {lessonCompleted && (
+        <div className="px-4 py-3 border-t border-emerald-800/50 bg-emerald-900/30 shrink-0">
+          <p className="text-sm text-emerald-300 font-medium text-center">El tutor ha marcado esta lección como completada</p>
+          <button
+            onClick={onMarkComplete}
+            className="w-full mt-2 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            Continuar a la siguiente lección
+          </button>
+        </div>
+      )}
+
+      {/* Input */}
+      <div className="p-3 border-t border-gray-800 bg-gray-900/50 shrink-0">
         <form onSubmit={handleSend} className="flex gap-2">
           <input
             ref={inputRef}
@@ -197,13 +255,6 @@ export default function LessonChat({ lesson, onDrawMolecule, onShowBohrModel, on
             Enviar
           </button>
         </form>
-        <button
-          onClick={onMarkComplete}
-          disabled={!canComplete}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:bg-gray-800 disabled:text-gray-600 text-white py-2 rounded-lg text-sm font-medium transition-colors"
-        >
-          ✓ Completar lección
-        </button>
       </div>
     </div>
   );

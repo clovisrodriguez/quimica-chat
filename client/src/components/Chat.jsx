@@ -1,15 +1,32 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import ChatMessage from './ChatMessage';
 
-export default function Chat({ injectedInput, onInputConsumed, onDrawMolecule, onShowBohrModel }) {
+export default function Chat({ injectedInput, onInputConsumed, onDrawMolecule, onShowBohrModel, onShowPeriodicTable }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef(null);
+  const scrollContainerRef = useRef(null);
   const inputRef = useRef(null);
+  const userScrolledUpRef = useRef(false);
+  const isAutoScrollingRef = useRef(false);
+
+  const handleScroll = useCallback(() => {
+    if (isAutoScrollingRef.current) return;
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    userScrolledUpRef.current = distanceFromBottom > 80;
+  }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (userScrolledUpRef.current) return;
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    isAutoScrollingRef.current = true;
+    el.scrollTop = el.scrollHeight;
+    // Reset flag after a tick so subsequent user scrolls are detected
+    requestAnimationFrame(() => { isAutoScrollingRef.current = false; });
   }, [messages]);
 
   useEffect(() => {
@@ -33,6 +50,7 @@ export default function Chat({ injectedInput, onInputConsumed, onDrawMolecule, o
 
     const assistantMessage = { role: 'assistant', content: '' };
     setMessages([...newMessages, assistantMessage]);
+    userScrolledUpRef.current = false;
 
     try {
       const res = await fetch('/api/chat', {
@@ -88,6 +106,18 @@ export default function Chat({ injectedInput, onInputConsumed, onDrawMolecule, o
                 return updated;
               });
             }
+            if (parsed.periodicTable) {
+              onShowPeriodicTable?.(parsed.periodicTable);
+              setMessages((prev) => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1];
+                updated[updated.length - 1] = {
+                  ...last,
+                  content: last.content + '\n\n📋 *Tabla periódica mostrada en el constructor*',
+                };
+                return updated;
+              });
+            }
             if (parsed.content) {
               accumulated += parsed.content;
               setMessages((prev) => {
@@ -101,6 +131,17 @@ export default function Chat({ injectedInput, onInputConsumed, onDrawMolecule, o
             }
           } catch {}
         }
+      }
+      // If no text was accumulated, show a fallback
+      if (!accumulated) {
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            role: 'assistant',
+            content: 'No recibí respuesta del servidor. Intenta de nuevo.',
+          };
+          return updated;
+        });
       }
     } catch (error) {
       setMessages((prev) => {
@@ -134,7 +175,7 @@ export default function Chat({ injectedInput, onInputConsumed, onDrawMolecule, o
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.length === 0 && (
           <div className="text-center text-gray-500 mt-12 space-y-3">
             <p className="text-4xl">🧪</p>

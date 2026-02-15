@@ -8,7 +8,9 @@ export default function App() {
   const [chatInput, setChatInput] = useState(null);
   const [moleculeData, setMoleculeData] = useState(null);
   const [bohrElement, setBohrElement] = useState(null);
+  const [periodicTableData, setPeriodicTableData] = useState(null);
   const [mode, setMode] = useState('chat');
+  const [constructorOpen, setConstructorOpen] = useState(false); // for Modo Clase
 
   const handleExplainWithAI = useCallback((text) => {
     setChatInput(text);
@@ -19,13 +21,28 @@ export default function App() {
   const handleDrawMolecule = useCallback((data) => {
     setMoleculeData(data);
     setBohrElement(null);
+    setConstructorOpen(true);
     setActiveTab('simulator');
   }, []);
 
   const handleShowBohrModel = useCallback((element) => {
     setBohrElement(element);
     setMoleculeData(null);
+    setPeriodicTableData(null);
+    setConstructorOpen(true);
     setActiveTab('simulator');
+  }, []);
+
+  const handleShowPeriodicTable = useCallback((data) => {
+    setPeriodicTableData(data);
+    setMoleculeData(null);
+    setBohrElement(null);
+    setConstructorOpen(true);
+    setActiveTab('simulator');
+  }, []);
+
+  const handlePeriodicTableViewed = useCallback(() => {
+    setPeriodicTableData(null);
   }, []);
 
   const handleMoleculeLoaded = useCallback(() => {
@@ -36,7 +53,21 @@ export default function App() {
     setBohrElement(null);
   }, []);
 
+  const handleClearConstructor = useCallback(() => {
+    setMoleculeData({ atoms: [], bonds: [] });
+    setBohrElement(null);
+    setConstructorOpen(false);
+  }, []);
+
+  const handleCollapseConstructor = useCallback(() => {
+    setConstructorOpen(false);
+  }, []);
+
   const rightTabLabel = mode === 'class' ? 'Modo Clase' : 'Chat IA';
+  const isClassMode = mode === 'class';
+  // In class mode: constructor only visible when constructorOpen
+  // In chat mode: always visible (original behavior)
+  const showConstructor = isClassMode ? constructorOpen : true;
 
   return (
     <div className="h-screen flex flex-col">
@@ -70,48 +101,66 @@ export default function App() {
         </div>
       </header>
 
-      {/* Mobile tabs */}
-      <div className="sm:hidden flex border-b border-gray-800 bg-gray-900">
-        <button
-          onClick={() => setActiveTab('simulator')}
-          className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
-            activeTab === 'simulator'
-              ? 'text-emerald-400 border-b-2 border-emerald-400'
-              : 'text-gray-400'
-          }`}
-        >
-          Constructor
-        </button>
-        <button
-          onClick={() => setActiveTab('chat')}
-          className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
-            activeTab === 'chat'
-              ? 'text-blue-400 border-b-2 border-blue-400'
-              : 'text-gray-400'
-          }`}
-        >
-          {rightTabLabel}
-        </button>
-      </div>
+      {/* Mobile tabs — only show in chat mode or when constructor is open in class mode */}
+      {(!isClassMode || constructorOpen) && (
+        <div className="sm:hidden flex border-b border-gray-800 bg-gray-900">
+          <button
+            onClick={() => setActiveTab('simulator')}
+            className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+              activeTab === 'simulator'
+                ? 'text-emerald-400 border-b-2 border-emerald-400'
+                : 'text-gray-400'
+            }`}
+          >
+            Constructor
+          </button>
+          <button
+            onClick={() => setActiveTab('chat')}
+            className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+              activeTab === 'chat'
+                ? 'text-blue-400 border-b-2 border-blue-400'
+                : 'text-gray-400'
+            }`}
+          >
+            {rightTabLabel}
+          </button>
+        </div>
+      )}
 
       {/* Desktop: side by side / Mobile: tabs */}
       <div className="flex-1 flex overflow-hidden">
+        {/* Constructor panel */}
+        {showConstructor && (
+          <div
+            className={`w-full ${isClassMode ? 'sm:w-1/2' : 'sm:w-[42%]'} sm:border-r sm:border-gray-800 ${
+              activeTab === 'simulator' ? 'flex' : 'hidden sm:flex'
+            } flex-col relative`}
+          >
+            {/* Collapse button in class mode */}
+            {isClassMode && (
+              <button
+                onClick={handleCollapseConstructor}
+                className="absolute top-2 right-2 z-20 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white text-xs px-2 py-1 rounded-lg transition-colors"
+              >
+                ✕ Cerrar
+              </button>
+            )}
+            <MoleculeBuilder
+              onExplainWithAI={handleExplainWithAI}
+              moleculeData={moleculeData}
+              onMoleculeLoaded={handleMoleculeLoaded}
+              bohrElement={bohrElement}
+              onBohrViewed={handleBohrViewed}
+              periodicTableData={periodicTableData}
+              onPeriodicTableViewed={handlePeriodicTableViewed}
+            />
+          </div>
+        )}
+
+        {/* Chat / Class panel */}
         <div
-          className={`w-full sm:w-[42%] sm:border-r sm:border-gray-800 ${
-            activeTab === 'simulator' ? 'flex' : 'hidden sm:flex'
-          } flex-col`}
-        >
-          <MoleculeBuilder
-            onExplainWithAI={handleExplainWithAI}
-            moleculeData={moleculeData}
-            onMoleculeLoaded={handleMoleculeLoaded}
-            bohrElement={bohrElement}
-            onBohrViewed={handleBohrViewed}
-          />
-        </div>
-        <div
-          className={`w-full sm:w-[58%] ${
-            activeTab === 'chat' ? 'flex' : 'hidden sm:flex'
+          className={`w-full ${showConstructor ? (isClassMode ? 'sm:w-1/2' : 'sm:w-[58%]') : 'sm:w-full'} ${
+            activeTab === 'chat' || (!showConstructor) ? 'flex' : 'hidden sm:flex'
           } flex-col`}
         >
           {mode === 'chat' ? (
@@ -120,11 +169,14 @@ export default function App() {
               onInputConsumed={() => setChatInput(null)}
               onDrawMolecule={handleDrawMolecule}
               onShowBohrModel={handleShowBohrModel}
+              onShowPeriodicTable={handleShowPeriodicTable}
             />
           ) : (
             <ClassMode
               onDrawMolecule={handleDrawMolecule}
               onShowBohrModel={handleShowBohrModel}
+              onShowPeriodicTable={handleShowPeriodicTable}
+              onClearConstructor={handleClearConstructor}
             />
           )}
         </div>

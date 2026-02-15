@@ -11,6 +11,7 @@ import {
   moleculeToPrompt,
 } from '../data/chemistry';
 import BohrModel from './BohrModel';
+import PeriodicTable from './PeriodicTable';
 
 const ELEMENT_LIST = ['C', 'H', 'O', 'N', 'S', 'P', 'F', 'Cl', 'Br', 'I'];
 const GRID_SPACING = 30;
@@ -19,7 +20,7 @@ const BOND_OFFSET = 4; // px offset for double/triple bond lines
 
 let nextId = 1;
 
-export default function MoleculeBuilder({ onExplainWithAI, moleculeData, onMoleculeLoaded, bohrElement, onBohrViewed }) {
+export default function MoleculeBuilder({ onExplainWithAI, moleculeData, onMoleculeLoaded, bohrElement, onBohrViewed, periodicTableData, onPeriodicTableViewed }) {
   const [atoms, setAtoms] = useState([]);
   const [bonds, setBonds] = useState([]);
   const [selectedElement, setSelectedElement] = useState('C');
@@ -29,6 +30,9 @@ export default function MoleculeBuilder({ onExplainWithAI, moleculeData, onMolec
   const [tool, setTool] = useState('place'); // 'place' | 'erase'
   const [viewedElement, setViewedElement] = useState('C');
   const [focusedBohr, setFocusedBohr] = useState(null); // element for full-screen Bohr view
+  const [showPeriodicTable, setShowPeriodicTable] = useState(null); // { highlight: [] } or null
+  const [bohrFromTable, setBohrFromTable] = useState(null); // periodic table state to return to
+  const [showHelp, setShowHelp] = useState(false);
 
   // Drag state (refs to avoid re-renders during drag)
   const dragRef = useRef(null); // { atomId, startX, startY, origX, origY, dragging }
@@ -73,6 +77,14 @@ export default function MoleculeBuilder({ onExplainWithAI, moleculeData, onMolec
     }
     onBohrViewed?.();
   }, [bohrElement, onBohrViewed]);
+
+  // ─── Show periodic table from AI ───
+  useEffect(() => {
+    if (!periodicTableData) return;
+    setShowPeriodicTable(periodicTableData);
+    setFocusedBohr(null);
+    onPeriodicTableViewed?.();
+  }, [periodicTableData, onPeriodicTableViewed]);
 
   // ─── SVG coordinate helpers ───
   const svgPoint = useCallback((clientX, clientY) => {
@@ -523,15 +535,15 @@ export default function MoleculeBuilder({ onExplainWithAI, moleculeData, onMolec
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
       {/* Header */}
       <div className="px-4 py-2.5 border-b border-gray-800 bg-gray-900/50 shrink-0">
         <h2 className="text-sm font-semibold text-emerald-400">Constructor de Moléculas</h2>
         <p className="text-xs text-gray-500">Arma moléculas átomo por átomo</p>
       </div>
 
-      {/* Atom palette */}
-      <div className="px-3 py-2 border-b border-gray-800 bg-gray-900/30 shrink-0">
+      {/* Atom palette — hidden when Bohr/periodic table overlay is active */}
+      {!focusedBohr && !showPeriodicTable && <div className="px-3 py-2 border-b border-gray-800 bg-gray-900/30 shrink-0">
         <div className="flex flex-wrap gap-1.5 justify-center">
           {ELEMENT_LIST.map((sym) => {
             const el = ELEMENTS[sym];
@@ -562,42 +574,55 @@ export default function MoleculeBuilder({ onExplainWithAI, moleculeData, onMolec
             );
           })}
         </div>
-      </div>
+      </div>}
 
-      {/* Toolbar + Bohr model row */}
-      <div className="px-3 py-2 border-b border-gray-800 bg-gray-900/30 shrink-0 flex items-center gap-3">
-        {/* Tool buttons */}
-        <div className="flex gap-1.5">
-          <button
-            onClick={() => { setTool('place'); setBondStart(null); }}
-            className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
-              tool === 'place'
-                ? 'bg-emerald-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
-            }`}
-          >
-            Colocar
-          </button>
-          <button
-            onClick={() => { setTool('erase'); setBondStart(null); }}
-            className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
-              tool === 'erase'
-                ? 'bg-red-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
-            }`}
-          >
-            Borrador
-          </button>
+      {/* Toolbar + Bohr model row — hidden when Bohr/periodic table overlay is active */}
+      {!focusedBohr && !showPeriodicTable && (
+        <div className="px-3 py-2 border-b border-gray-800 bg-gray-900/30 shrink-0 flex items-center gap-3">
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => { setTool('place'); setBondStart(null); }}
+              className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
+                tool === 'place'
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+              }`}
+            >
+              Colocar
+            </button>
+            <button
+              onClick={() => { setTool('erase'); setBondStart(null); }}
+              className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
+                tool === 'erase'
+                  ? 'bg-red-600 text-white'
+                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+              }`}
+            >
+              Borrador
+            </button>
+          </div>
+          <div className="ml-auto">
+            <BohrModel element={viewedElement} />
+          </div>
         </div>
-
-        {/* Bohr model */}
-        <div className="ml-auto">
-          <BohrModel element={viewedElement} />
-        </div>
-      </div>
+      )}
 
       {/* SVG workspace */}
       <div className="flex-1 overflow-hidden bg-gray-950 relative">
+        {/* Periodic table overlay */}
+        {showPeriodicTable && (
+          <PeriodicTable
+            highlight={showPeriodicTable.highlight || []}
+            onElementClick={(symbol) => {
+              setBohrFromTable(showPeriodicTable);
+              setShowPeriodicTable(null);
+              setFocusedBohr(symbol);
+              setViewedElement(symbol);
+            }}
+            onClose={() => setShowPeriodicTable(null)}
+          />
+        )}
+
         {/* Focused Bohr model overlay */}
         {focusedBohr && ELEMENTS[focusedBohr] && (() => {
           const el = ELEMENTS[focusedBohr];
@@ -610,7 +635,7 @@ export default function MoleculeBuilder({ onExplainWithAI, moleculeData, onMolec
           const c = svgSize / 2;
           return (
             <div className="absolute inset-0 z-10 bg-gray-950/95 flex flex-col items-center justify-center gap-4 p-4">
-              <svg width={svgSize} height={svgSize} viewBox={`0 0 ${svgSize} ${svgSize}`} className="max-w-full max-h-[60%]">
+              <svg width={svgSize} height={svgSize} viewBox={`0 0 ${svgSize} ${svgSize}`} className="max-w-full max-h-[75%]">
                 {el.electronShells.map((count, i) => {
                   const r = baseR + (i + 1) * shellGap;
                   const electrons = [];
@@ -658,12 +683,26 @@ export default function MoleculeBuilder({ onExplainWithAI, moleculeData, onMolec
                   Capas: {el.electronShells.map((count, i) => `n${i + 1}=${count}`).join(', ')}
                 </p>
               </div>
-              <button
-                onClick={() => setFocusedBohr(null)}
-                className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg transition-colors"
-              >
-                Cerrar modelo de Bohr
-              </button>
+              <div className="flex gap-2">
+                {bohrFromTable && (
+                  <button
+                    onClick={() => {
+                      setFocusedBohr(null);
+                      setShowPeriodicTable(bohrFromTable);
+                      setBohrFromTable(null);
+                    }}
+                    className="text-xs bg-emerald-800 hover:bg-emerald-700 text-emerald-200 px-4 py-2 rounded-lg transition-colors"
+                  >
+                    ← Volver a tabla periódica
+                  </button>
+                )}
+                <button
+                  onClick={() => { setFocusedBohr(null); setBohrFromTable(null); }}
+                  className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg transition-colors"
+                >
+                  Cerrar modelo de Bohr
+                </button>
+              </div>
             </div>
           );
         })()}
@@ -711,90 +750,114 @@ export default function MoleculeBuilder({ onExplainWithAI, moleculeData, onMolec
         </svg>
       </div>
 
-      {/* Info panel */}
-      <div className="px-4 py-3 border-t border-gray-800 bg-gray-900/50 shrink-0 space-y-2">
-        {atoms.length > 0 ? (
-          <>
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className="text-sm font-mono text-emerald-300">{formatFormula(formula)}</span>
-              {molecule && (
-                <span className="text-sm font-bold text-white bg-emerald-800/40 px-2 py-0.5 rounded">
-                  {molecule.name}
-                </span>
-              )}
-            </div>
-            {groups.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {groups.map((g, i) => (
-                  <span
-                    key={i}
-                    className="text-xs bg-gray-800 border border-emerald-700/50 text-emerald-300 px-2 py-0.5 rounded-full"
-                  >
-                    {g.name}
+      {/* Info panel — hidden when Bohr/periodic table overlay is active */}
+      {!focusedBohr && !showPeriodicTable && (
+        <div className="px-4 py-3 border-t border-gray-800 bg-gray-900/50 shrink-0 space-y-2">
+          {atoms.length > 0 ? (
+            <>
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-sm font-mono text-emerald-300">{formatFormula(formula)}</span>
+                {molecule && (
+                  <span className="text-sm font-bold text-white bg-emerald-800/40 px-2 py-0.5 rounded">
+                    {molecule.name}
                   </span>
-                ))}
+                )}
               </div>
-            )}
-            {/* Valence details */}
-            {atoms.some((a) => remainingBonds(a, atoms, bonds) > 0) && (
-              <div className="text-xs space-y-1">
-                <p className="text-yellow-500 font-medium">
-                  Átomos con enlaces sin completar:
-                </p>
+              {groups.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
-                  {atoms.filter((a) => remainingBonds(a, atoms, bonds) > 0).map((a) => {
-                    const rem = remainingBonds(a, atoms, bonds);
-                    const el = ELEMENTS[a.element];
-                    return (
-                      <span key={a.id} className="bg-yellow-900/30 border border-yellow-700/50 text-yellow-300 px-1.5 py-0.5 rounded">
-                        {a.element} necesita {rem} enlace{rem > 1 ? 's' : ''} más
-                      </span>
-                    );
-                  })}
+                  {groups.map((g, i) => (
+                    <span
+                      key={i}
+                      className="text-xs bg-gray-800 border border-emerald-700/50 text-emerald-300 px-2 py-0.5 rounded-full"
+                    >
+                      {g.name}
+                    </span>
+                  ))}
                 </div>
-                <p className="text-gray-500">
-                  Tip: El número en cada átomo indica cuántos enlaces le faltan.
-                  Agrega H para completar valencias.
+              )}
+              {atoms.some((a) => remainingBonds(a, atoms, bonds) > 0) && (
+                <div className="text-xs space-y-1">
+                  <p className="text-yellow-500 font-medium">
+                    Átomos con enlaces sin completar:
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {atoms.filter((a) => remainingBonds(a, atoms, bonds) > 0).map((a) => {
+                      const rem = remainingBonds(a, atoms, bonds);
+                      return (
+                        <span key={a.id} className="bg-yellow-900/30 border border-yellow-700/50 text-yellow-300 px-1.5 py-0.5 rounded">
+                          {a.element} necesita {rem} enlace{rem > 1 ? 's' : ''} más
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {atoms.length > 0 && atoms.every((a) => remainingBonds(a, atoms, bonds) === 0) && bonds.length > 0 && (
+                <p className="text-xs text-emerald-500">
+                  Todas las valencias están completas.
                 </p>
-              </div>
-            )}
-            {atoms.length > 0 && atoms.every((a) => remainingBonds(a, atoms, bonds) === 0) && bonds.length > 0 && (
-              <p className="text-xs text-emerald-500">
-                Todas las valencias están completas. ¡Molécula válida!
-              </p>
-            )}
-          </>
-        ) : (
-          <div className="text-xs text-gray-500 space-y-1.5">
-            <p className="font-medium text-gray-400">¿Cómo usar?</p>
-            <p>1. Selecciona un elemento arriba (C, H, O...)</p>
-            <p>2. Haz clic en el área para colocar átomos</p>
-            <p>3. Haz clic en un átomo y luego en otro para enlazarlos</p>
-            <p>4. Clic en un enlace para cambiarlo: simple → doble → triple → quitar</p>
-            <p>5. Usa el "Borrador" o clic derecho para eliminar átomos/enlaces</p>
-            <p className="text-gray-600 mt-1">Cada elemento tiene un número máximo de enlaces (valencia):
-              C=4, H=1, O=2, N=3</p>
-          </div>
-        )}
+              )}
+            </>
+          ) : (
+            <p className="text-xs text-gray-500 text-center">Haz clic en el área para colocar átomos</p>
+          )}
 
-        {/* Action buttons */}
-        <div className="flex gap-2">
-          <button
-            onClick={handleExplain}
-            disabled={atoms.length === 0}
-            className="bg-blue-600/80 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
-          >
-            Explicar con IA
-          </button>
-          <button
-            onClick={handleClear}
-            disabled={atoms.length === 0}
-            className="text-xs text-gray-400 hover:text-white disabled:text-gray-600 px-2 py-1 rounded transition-colors"
-          >
-            Limpiar todo
-          </button>
+          {/* Action buttons */}
+          <div className="flex gap-2 items-center">
+            <button
+              onClick={handleExplain}
+              disabled={atoms.length === 0}
+              className="bg-blue-600/80 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Explicar con IA
+            </button>
+            <button
+              onClick={handleClear}
+              disabled={atoms.length === 0}
+              className="text-xs text-gray-400 hover:text-white disabled:text-gray-600 px-2 py-1 rounded transition-colors"
+            >
+              Limpiar todo
+            </button>
+            <button
+              onClick={() => setShowPeriodicTable({ highlight: [] })}
+              className="ml-auto text-xs text-gray-500 hover:text-gray-300 transition-colors"
+              title="Tabla periódica"
+            >
+              📋 Tabla
+            </button>
+            <button
+              onClick={() => setShowHelp(true)}
+              className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+              title="Ayuda"
+            >
+              ? Ayuda
+            </button>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Help modal */}
+      {showHelp && (
+        <div className="absolute inset-0 z-30 bg-gray-950/90 flex items-center justify-center p-6" onClick={() => setShowHelp(false)}>
+          <div className="bg-gray-800 rounded-xl p-5 max-w-sm space-y-2 border border-gray-700" onClick={(e) => e.stopPropagation()}>
+            <p className="font-medium text-gray-200 text-sm">¿Cómo usar el constructor?</p>
+            <div className="text-xs text-gray-400 space-y-1.5">
+              <p>1. Selecciona un elemento en la paleta (C, H, O...)</p>
+              <p>2. Haz clic en el área para colocar átomos</p>
+              <p>3. Clic en un átomo y luego en otro para enlazarlos</p>
+              <p>4. Clic en un enlace: simple → doble → triple → quitar</p>
+              <p>5. Usa "Borrador" o clic derecho para eliminar</p>
+              <p className="text-gray-500 mt-2">Valencias: C=4, H=1, O=2, N=3, S=2, P=3</p>
+            </div>
+            <button
+              onClick={() => setShowHelp(false)}
+              className="w-full mt-3 bg-gray-700 hover:bg-gray-600 text-white text-xs py-2 rounded-lg transition-colors"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
