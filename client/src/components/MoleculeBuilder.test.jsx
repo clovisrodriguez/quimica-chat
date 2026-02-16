@@ -83,10 +83,9 @@ describe('MoleculeBuilder', () => {
     expect(screen.getByText('Haz clic para colocar un átomo')).toBeInTheDocument();
   });
 
-  it('shows usage instructions when no atoms', () => {
+  it('shows help button when no atoms', () => {
     render(<MoleculeBuilder {...defaultProps} />);
-    expect(screen.getByText('¿Cómo usar?')).toBeInTheDocument();
-    expect(screen.getByText(/Usa el "Borrador" o clic derecho/)).toBeInTheDocument();
+    expect(screen.getByText('? Ayuda')).toBeInTheDocument();
   });
 
   it('disables Explicar and Limpiar buttons when no atoms', () => {
@@ -115,13 +114,13 @@ describe('MoleculeBuilder', () => {
     };
     render(<MoleculeBuilder {...defaultProps} moleculeData={moleculeData} />);
     expect(defaultProps.onMoleculeLoaded).toHaveBeenCalled();
-    expect(screen.queryByText('¿Cómo usar?')).not.toBeInTheDocument();
+    expect(screen.queryByText('Haz clic en el área para colocar átomos')).not.toBeInTheDocument();
   });
 
   it('does not load when moleculeData has no atoms array', () => {
     const moleculeData = { atoms: 'invalid' };
     render(<MoleculeBuilder {...defaultProps} moleculeData={moleculeData} />);
-    expect(screen.getByText('¿Cómo usar?')).toBeInTheDocument();
+    expect(screen.getByText('Haz clic en el área para colocar átomos')).toBeInTheDocument();
   });
 
   it('toggles between place and erase modes', () => {
@@ -233,11 +232,11 @@ describe('MoleculeBuilder', () => {
       bonds: [],
     };
     render(<MoleculeBuilder {...defaultProps} moleculeData={moleculeData} />);
-    expect(screen.queryByText('¿Cómo usar?')).not.toBeInTheDocument();
+    expect(screen.queryByText('Haz clic en el área para colocar átomos')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Limpiar todo'));
 
-    expect(screen.getByText('¿Cómo usar?')).toBeInTheDocument();
+    expect(screen.getByText('Haz clic en el área para colocar átomos')).toBeInTheDocument();
     expect(screen.getByText('Explicar con IA')).toBeDisabled();
   });
 
@@ -257,7 +256,7 @@ describe('MoleculeBuilder', () => {
     };
     render(<MoleculeBuilder {...defaultProps} moleculeData={moleculeData} />);
     expect(defaultProps.onMoleculeLoaded).toHaveBeenCalled();
-    expect(screen.queryByText('¿Cómo usar?')).not.toBeInTheDocument();
+    expect(screen.queryByText('Haz clic en el área para colocar átomos')).not.toBeInTheDocument();
   });
 
   it('handles moleculeData with out-of-range bond indices', () => {
@@ -276,7 +275,7 @@ describe('MoleculeBuilder', () => {
 
   it('handles null moleculeData gracefully', () => {
     render(<MoleculeBuilder {...defaultProps} moleculeData={null} />);
-    expect(screen.getByText('¿Cómo usar?')).toBeInTheDocument();
+    expect(screen.getByText('Haz clic en el área para colocar átomos')).toBeInTheDocument();
   });
 
   it('handles moleculeData with no bonds array', () => {
@@ -456,7 +455,7 @@ describe('MoleculeBuilder', () => {
       // Empty state hint should disappear
       expect(screen.queryByText('Haz clic para colocar un átomo')).not.toBeInTheDocument();
       // Should show formula
-      expect(screen.queryByText('¿Cómo usar?')).not.toBeInTheDocument();
+      expect(screen.queryByText('Haz clic en el área para colocar átomos')).not.toBeInTheDocument();
     });
 
     it('places atom of selected element', () => {

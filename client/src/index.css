@@ -46,6 +46,15 @@
   @apply text-emerald-300;
 }
 
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.chat-message-enter {
+  animation: fadeIn 0.3s ease-out both;
+}
+
 @keyframes pulse-dot {
   0%, 80%, 100% { opacity: 0.3; }
   40% { opacity: 1; }
@@ -56,3 +65,17 @@
 }
 .typing-dot:nth-child(2) { animation-delay: 0.2s; }
 .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+/* Streaming cursor effect — blinking caret after last character */
+.streaming-text *:last-child::after {
+  content: '▊';
+  animation: blink-cursor 0.8s step-end infinite;
+  color: #9ca3af;
+  font-weight: normal;
+  margin-left: 1px;
+}
+
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}

@@ -1,0 +1,22 @@
+name: Trigger VPS Redeploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Redeploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ~/quimica-chat-private
+            git submodule update --remote app
+            cd deploy
+            docker compose build --no-cache
+            docker compose up -d

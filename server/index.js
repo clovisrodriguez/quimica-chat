@@ -2,6 +2,10 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import OpenAI from 'openai';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -9,7 +13,14 @@ const PORT = process.env.PORT || 3001;
 app.use(cors({ origin: true }));
 app.use(express.json());
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const provider = process.env.AI_PROVIDER || 'openai';
+const model = process.env.AI_MODEL || 'gpt-5.2-chat-latest';
+
+const clientConfig = provider === 'gemini'
+  ? { apiKey: process.env.GEMINI_API_KEY, baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/' }
+  : { apiKey: process.env.OPENAI_API_KEY };
+
+const openai = new OpenAI(clientConfig);
 
 const SYSTEM_PROMPT = `Eres un tutor experto en química orgánica que responde en español.
 
@@ -168,8 +179,9 @@ app.post('/api/chat', async (req, res) => {
     return res.status(400).json({ error: 'Se requiere un array de messages' });
   }
 
-  if (!process.env.OPENAI_API_KEY) {
-    return res.status(500).json({ error: 'OPENAI_API_KEY no configurada en el servidor' });
+  const apiKey = provider === 'gemini' ? process.env.GEMINI_API_KEY : process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ error: `API key no configurada para el proveedor: ${provider}` });
   }
 
   res.setHeader('Content-Type', 'text/event-stream');
@@ -180,11 +192,10 @@ app.post('/api/chat', async (req, res) => {
     const allMessages = [{ role: 'system', content: systemPrompt || SYSTEM_PROMPT }, ...messages];
 
     const stream = await openai.chat.completions.create({
-      model: 'gpt-5.2-chat-latest',
+      model,
       messages: allMessages,
       tools: [DRAW_MOLECULE_TOOL, SHOW_BOHR_MODEL_TOOL, SHOW_PERIODIC_TABLE_TOOL, COMPLETE_LESSON_TOOL],
       stream: true,
-
       max_completion_tokens: messages.length <= 2 ? 800 : 2048,
     });
 
@@ -308,10 +319,9 @@ app.post('/api/chat', async (req, res) => {
       const followUpMessages = [...allMessages, assistantMsg, ...toolResults];
 
       const followUpStream = await openai.chat.completions.create({
-        model: 'gpt-5.2-chat-latest',
+        model,
         messages: followUpMessages,
         stream: true,
-  
         max_completion_tokens: 1024,
       });
 
@@ -326,9 +336,9 @@ app.post('/api/chat', async (req, res) => {
     res.write('data: [DONE]\n\n');
     res.end();
   } catch (error) {
-    console.error('OpenAI error:', error.message);
+    console.error(`${provider} error:`, error.message);
     if (!res.headersSent) {
-      res.status(500).json({ error: 'Error al comunicarse con OpenAI' });
+      res.status(500).json({ error: `Error al comunicarse con ${provider}` });
     } else {
       res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
       res.end();
@@ -337,9 +347,17 @@ app.post('/api/chat', async (req, res) => {
 });
 
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', hasApiKey: !!process.env.OPENAI_API_KEY });
+  const apiKey = provider === 'gemini' ? process.env.GEMINI_API_KEY : process.env.OPENAI_API_KEY;
+  res.json({ status: 'ok', provider, model, hasApiKey: !!apiKey });
+});
+
+// Serve static files in production (built client in ./public)
+const publicDir = join(__dirname, 'public');
+app.use(express.static(publicDir));
+app.get('*', (_req, res) => {
+  res.sendFile(join(publicDir, 'index.html'));
 });
 
 app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+  console.log(`Servidor corriendo en http://localhost:${PORT} [${provider}/${model}]`);
 });

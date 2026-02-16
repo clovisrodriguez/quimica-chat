@@ -30,12 +30,11 @@ describe('ChatMessage', () => {
     expect(bold.tagName).toBe('STRONG');
   });
 
-  it('shows typing dots when streaming with content', () => {
+  it('shows streaming cursor class when streaming with content', () => {
     const { container } = render(
       <ChatMessage message={{ role: 'assistant', content: 'Loading...' }} isStreaming={true} />
     );
-    const dots = container.querySelectorAll('.typing-dot');
-    expect(dots.length).toBe(3);
+    expect(container.querySelector('.streaming-text')).toBeInTheDocument();
   });
 
   it('shows typing dots when streaming without content', () => {
@@ -66,5 +65,14 @@ describe('ChatMessage', () => {
       <ChatMessage message={{ role: 'assistant', content: 'Hi' }} isStreaming={false} />
     );
     expect(container.firstChild).toHaveClass('justify-start');
+  });
+
+  it('renders markdown tables with remark-gfm', () => {
+    const table = '| Grupo | Ejemplo |\n|-------|--------|\n| -OH | Etanol |\n| -COOH | Ácido acético |';
+    const { container } = render(
+      <ChatMessage message={{ role: 'assistant', content: table }} isStreaming={false} />
+    );
+    expect(container.querySelector('table')).toBeInTheDocument();
+    expect(container.querySelectorAll('tr').length).toBe(3); // header + 2 rows
   });
 });
