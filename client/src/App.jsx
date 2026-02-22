@@ -1,16 +1,20 @@
 import { useState, useCallback } from 'react';
+import { useAuth } from './contexts/AuthContext';
 import Chat from './components/Chat';
 import ClassMode from './components/ClassMode';
 import MoleculeBuilder from './components/MoleculeBuilder';
+import Login from './components/Login';
 
-export default function App() {
+function AppContent() {
+  const { user, authEnabled, logout } = useAuth();
+
   const [activeTab, setActiveTab] = useState('simulator');
   const [chatInput, setChatInput] = useState(null);
   const [moleculeData, setMoleculeData] = useState(null);
   const [bohrElement, setBohrElement] = useState(null);
   const [periodicTableData, setPeriodicTableData] = useState(null);
   const [mode, setMode] = useState('chat');
-  const [constructorOpen, setConstructorOpen] = useState(false); // for Modo Clase
+  const [constructorOpen, setConstructorOpen] = useState(false);
 
   const handleExplainWithAI = useCallback((text) => {
     setChatInput(text);
@@ -65,8 +69,6 @@ export default function App() {
 
   const rightTabLabel = mode === 'class' ? 'Modo Clase' : 'Chat IA';
   const isClassMode = mode === 'class';
-  // In class mode: constructor only visible when constructorOpen
-  // In chat mode: always visible (original behavior)
   const showConstructor = isClassMode ? constructorOpen : true;
 
   return (
@@ -77,31 +79,46 @@ export default function App() {
         <span className="text-sm text-gray-400 hidden sm:inline">
           Tutor de Quimica Organica + Constructor
         </span>
-        <div className="ml-auto flex bg-gray-800 rounded-lg p-0.5">
-          <button
-            onClick={() => setMode('chat')}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-              mode === 'chat'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            Chat IA
-          </button>
-          <button
-            onClick={() => setMode('class')}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-              mode === 'class'
-                ? 'bg-emerald-600 text-white'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            Modo Clase
-          </button>
+        <div className="ml-auto flex items-center gap-2">
+          {authEnabled && user && (
+            <div className="hidden sm:flex items-center gap-2 mr-2">
+              <span className="text-xs text-gray-400">{user.email}</span>
+              <span className={`text-xs px-1.5 py-0.5 rounded ${user.tier === 'paid' ? 'bg-emerald-900/50 text-emerald-400' : 'bg-gray-800 text-gray-400'}`}>
+                {user.tier === 'paid' ? 'Pro' : 'Free'}
+              </span>
+              <button
+                onClick={logout}
+                className="text-xs text-gray-500 hover:text-white transition-colors"
+              >
+                Salir
+              </button>
+            </div>
+          )}
+          <div className="flex bg-gray-800 rounded-lg p-0.5">
+            <button
+              onClick={() => setMode('chat')}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                mode === 'chat'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Chat IA
+            </button>
+            <button
+              onClick={() => setMode('class')}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                mode === 'class'
+                  ? 'bg-emerald-600 text-white'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Modo Clase
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* Mobile tabs — only show in chat mode or when constructor is open in class mode */}
       {(!isClassMode || constructorOpen) && (
         <div className="sm:hidden flex border-b border-gray-800 bg-gray-900">
           <button
@@ -127,16 +144,13 @@ export default function App() {
         </div>
       )}
 
-      {/* Desktop: side by side / Mobile: tabs */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Constructor panel */}
         {showConstructor && (
           <div
             className={`w-full ${isClassMode ? 'sm:w-1/2' : 'sm:w-[42%]'} sm:border-r sm:border-gray-800 ${
               activeTab === 'simulator' ? 'flex' : 'hidden sm:flex'
             } flex-col relative`}
           >
-            {/* Collapse button in class mode */}
             {isClassMode && (
               <button
                 onClick={handleCollapseConstructor}
@@ -157,7 +171,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Chat / Class panel */}
         <div
           className={`w-full ${showConstructor ? (isClassMode ? 'sm:w-1/2' : 'sm:w-[58%]') : 'sm:w-full'} ${
             activeTab === 'chat' || (!showConstructor) ? 'flex' : 'hidden sm:flex'
@@ -183,4 +196,22 @@ export default function App() {
       </div>
     </div>
   );
+}
+
+export default function App() {
+  const { loading, authEnabled, user } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="h-screen bg-gray-950 flex items-center justify-center">
+        <span className="text-gray-500 text-sm">Cargando...</span>
+      </div>
+    );
+  }
+
+  if (authEnabled && !user) {
+    return <Login />;
+  }
+
+  return <AppContent />;
 }

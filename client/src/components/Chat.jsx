@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import ChatMessage from './ChatMessage';
 
 export default function Chat({ injectedInput, onInputConsumed, onDrawMolecule, onShowBohrModel, onShowPeriodicTable }) {
+  const { user, authEnabled, refreshUser } = useAuth();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -61,6 +63,12 @@ export default function Chat({ injectedInput, onInputConsumed, onDrawMolecule, o
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
+        if (res.status === 429) {
+          throw new Error(err.error || 'Límite de mensajes alcanzado. Vuelve mañana o mejora tu plan.');
+        }
+        if (res.status === 401) {
+          throw new Error('Sesión expirada. Recarga la página para iniciar sesión.');
+        }
         throw new Error(err.error || 'Error del servidor');
       }
 
@@ -143,6 +151,8 @@ export default function Chat({ injectedInput, onInputConsumed, onDrawMolecule, o
           return updated;
         });
       }
+      // Refresh user to update quota display
+      if (authEnabled) refreshUser();
     } catch (error) {
       setMessages((prev) => {
         const updated = [...prev];
@@ -162,7 +172,14 @@ export default function Chat({ injectedInput, onInputConsumed, onDrawMolecule, o
       <div className="px-4 py-2.5 border-b border-gray-800 bg-gray-900/50 shrink-0 flex items-center justify-between">
         <div>
           <h2 className="text-sm font-semibold text-blue-400">Chat con IA</h2>
-          <p className="text-xs text-gray-500">Pregunta sobre quimica organica</p>
+          <p className="text-xs text-gray-500">
+            Pregunta sobre quimica organica
+            {authEnabled && user?.usage && (
+              <span className="ml-2 text-gray-600">
+                {user.usage.used}/{user.usage.limit} mensajes hoy
+              </span>
+            )}
+          </p>
         </div>
         {messages.length > 0 && (
           <button

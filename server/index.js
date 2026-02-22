@@ -358,6 +358,13 @@ app.get('*', (_req, res) => {
   res.sendFile(join(publicDir, 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT} [${provider}/${model}]`);
-});
+// Export for use as a module (e.g., billing wrapper)
+export { app };
+
+// Only start listening if run directly (not imported)
+const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+if (isMain) {
+  app.listen(PORT, () => {
+    console.log(`Servidor corriendo en http://localhost:${PORT} [${provider}/${model}]`);
+  });
+}

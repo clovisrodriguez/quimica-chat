@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import ChatMessage from './ChatMessage';
 
 export default function LessonChat({ lesson, onDrawMolecule, onShowBohrModel, onShowPeriodicTable, onMarkComplete, onBack }) {
+  const { user, authEnabled, refreshUser } = useAuth();
   const [messages, setMessages] = useState([]);       // visible messages
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -73,6 +75,12 @@ export default function LessonChat({ lesson, onDrawMolecule, onShowBohrModel, on
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
+        if (res.status === 429) {
+          throw new Error(err.error || 'Límite de mensajes alcanzado. Vuelve mañana o mejora tu plan.');
+        }
+        if (res.status === 401) {
+          throw new Error('Sesión expirada. Recarga la página para iniciar sesión.');
+        }
         throw new Error(err.error || 'Error del servidor');
       }
 
@@ -159,6 +167,8 @@ export default function LessonChat({ lesson, onDrawMolecule, onShowBohrModel, on
       }
       // Add assistant response to API history
       apiMessagesRef.current = [...apiMessagesRef.current, { role: 'assistant', content: accumulated }];
+      // Refresh user to update quota display
+      if (authEnabled) refreshUser();
     } catch (error) {
       setMessages((prev) => {
         const updated = [...prev];
@@ -188,11 +198,16 @@ export default function LessonChat({ lesson, onDrawMolecule, onShowBohrModel, on
         >
           ← Volver
         </button>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold text-emerald-400 truncate">
             Lección {lesson.order}: {lesson.title}
           </h2>
         </div>
+        {authEnabled && user?.usage && (
+          <span className="text-xs text-gray-500 whitespace-nowrap">
+            {user.usage.used}/{user.usage.limit}
+          </span>
+        )}
       </div>
 
       {/* Exercise banner */}

@@ -1,15 +1,25 @@
 import { isLessonUnlocked } from '../data/progress';
 
-export default function LessonList({ lessons, progress, onSelectLesson }) {
+export default function LessonList({ lessons, progress, courseName, onSelectLesson, onBack }) {
   const completedCount = progress.completedLessons.length;
   const totalCount = lessons.length;
-  const pct = Math.round((completedCount / totalCount) * 100);
+  const pct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 py-3 border-b border-gray-800 bg-gray-900/50 shrink-0">
-        <h2 className="text-sm font-semibold text-emerald-400">Modo Clase</h2>
-        <p className="text-xs text-gray-500 mb-2">Curso de Química Orgánica</p>
+        <div className="flex items-center gap-2 mb-1">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="text-gray-400 hover:text-white text-sm transition-colors"
+            >
+              ← Cursos
+            </button>
+          )}
+          <h2 className="text-sm font-semibold text-emerald-400">Modo Clase</h2>
+        </div>
+        <p className="text-xs text-gray-500 mb-2">{courseName}</p>
         <div className="flex items-center gap-2">
           <div className="flex-1 h-2 bg-gray-700 rounded-full overflow-hidden">
             <div
